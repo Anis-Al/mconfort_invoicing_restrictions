@@ -1,3 +1,4 @@
+from odoo import api, fields, models
 from odoo.exceptions import AccessError
 
 RESTRICTED_GROUP = 'account.group_account_invoice'
@@ -20,3 +21,20 @@ def forbid_unlink(records, operation):
             model=description,
         ))
     return None
+
+
+class InvoicingOnlyMixin(models.AbstractModel):
+    _name = 'mconfort.invoicing.only.mixin'
+    _description = "Invoicing-Only User Flag"
+
+    invoicing_only_user = fields.Boolean(
+        string="Invoicing-Only User",
+        compute='_compute_invoicing_only_user',
+        help="Technical field: True when the current user is an Invoicing-only user.",
+    )
+
+    @api.depends_context('uid')
+    def _compute_invoicing_only_user(self):
+        restricted = is_invoicing_only(self.env)
+        for record in self:
+            record.invoicing_only_user = restricted

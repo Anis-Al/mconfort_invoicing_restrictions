@@ -1,6 +1,7 @@
 # mconfort_invoicing_restrictions
 
-Odoo 19 module, author Anis Alim, installed on `mconfort`.
+Odoo 19 module, author Anis Alim, installed on `mconfort-new` and on `mconfort`
+(a pg_dump copy of `mconfort-new` made 2026-09-19, new dbuuid).
 
 Restricts users of the **Invoicing** group (`account.group_account_invoice`) who are
 **not** Bookkeeper/Administrator (`account.group_account_user`, implied by
@@ -11,6 +12,8 @@ Restricts users of the **Invoicing** group (`account.group_account_invoice`) who
 | `account.move` form | `button_draft` (Reset to Draft) visible to `account.group_account_user` only |
 | `account.move` form + invoice list | `invoice_date_due` readonly when `state == 'posted'` |
 | `account.payment` form | `action_draft` (Reset to Draft) visible to `account.group_account_user` only |
+| `account.payment` form | `date` always readonly, any state |
+| `account.payment.register` wizard (Create/Register Payment) | `payment_date` always readonly (stays today's default) |
 | `account.move`, `account.payment` | deletion denied (server-side + Delete action hidden) |
 
 ## Code notes
@@ -35,10 +38,9 @@ Notes that would otherwise live as comments in the source.
   delete for everyone. `purchase.access_account_move` also grants `unlink`, so the ACL
   union leaks anyway. `_check_access` is evaluated per user, whatever the ACL union
   says.
-
-### `models/account_move.py`
-
-- `invoicing_only_user` — technical non-stored compute, `@api.depends_context('uid')`.
+- `mconfort.invoicing.only.mixin` — abstract model carrying `invoicing_only_user`, mixed
+  into `account.move`, `account.payment` and `account.payment.register`.
+  `invoicing_only_user` is a technical non-stored compute, `@api.depends_context('uid')`.
   It exists because view `readonly`/`invisible` expressions cannot test group
   membership; the client evaluates them against record values only.
 
@@ -57,7 +59,7 @@ Notes that would otherwise live as comments in the source.
 
 - Neither `account.move` nor `account.payment` has an `active` field, so **archiving
   does not exist** on these models for any user — nothing to restrict.
-- The readonly on `invoice_date_due` is a UI rule; an Invoicing user can still change
+- The readonly on `invoice_date_due`, payment `date` and wizard `payment_date` is a UI rule; an Invoicing user can still change
   it through RPC/import. Add a `write()` guard if that matters.
 - The delete denial is absolute for those users, including deletions triggered
   indirectly by a flow they run in their own name (e.g. removing a bank statement
@@ -69,8 +71,19 @@ Notes that would otherwise live as comments in the source.
 & "C:\Program Files\Odoo 19.0.20260724\python\python.exe" `
   "C:\Program Files\Odoo 19.0.20260724\server\odoo-bin" `
   -c "C:\Program Files\Odoo 19.0.20260724\server\odoo.conf" `
-  -d mconfort -u mconfort_invoicing_restrictions --stop-after-init --no-http --logfile=- --log-level=warn
+  -d mconfort-new -u mconfort_invoicing_restrictions --stop-after-init --no-http --logfile=- --log-level=warn
 ```
 
 Tests (2, passing): add `--test-enable --test-tags /mconfort_invoicing_restrictions`.
 `--logfile=-` prints nothing through the PowerShell tool — write to a file and read it.
+Tests also need `--data-dir=<scratch dir>`: the real filestore dirs are owned by the
+service account, so `os.makedirs(exist_ok=True)` raises `FileExistsError` (WinError 183)
+in `setUpClass` when the test user's avatar is written.
+
+⚠️ `odoo-bin -d <db> -u ...` on a db that does not exist **creates it** and installs
+`base` (log: `Initializing database <db>`). Check `\l` first.
+
+⚠️ A `-u` from a second odoo-bin hot-reloads views/data only. The running service never
+re-imports Python, so a new field used in a view breaks the form in the browser
+(`EvalError: Name '<field>' is not defined`) until an elevated
+`Restart-Service odoo-server-19.0 -Force`.

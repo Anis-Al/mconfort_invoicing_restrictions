@@ -29,9 +29,12 @@ class TestInvoicingRestrictions(TransactionCase):
         with self.assertRaises(AccessError):
             invoice.unlink()
         self.assertFalse(self.env['account.payment'].with_user(self.invoicing_user).has_access('unlink'))
+        for model in ('account.payment', 'account.payment.register'):
+            self.assertTrue(self.env[model].with_user(self.invoicing_user).new({}).invoicing_only_user)
 
     def test_bookkeeper_keeps_delete(self):
         self.invoicing_user.group_ids = [(4, self.env.ref('account.group_account_user').id)]
         invoice = self.invoice.with_user(self.invoicing_user)
         self.assertTrue(invoice.has_access('unlink'))
         self.assertFalse(invoice.invoicing_only_user)
+        self.assertFalse(self.env['account.payment.register'].with_user(self.invoicing_user).new({}).invoicing_only_user)

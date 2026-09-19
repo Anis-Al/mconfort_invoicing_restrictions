@@ -8,6 +8,20 @@
             <xpath expr="//button[@name='action_draft']" position="attributes">
                 <attribute name="groups">account.group_account_user</attribute>
             </xpath>
+            <xpath expr="//group[@name='group1']/field[@name='date']" position="attributes">
+                <attribute name="readonly">invoicing_only_user or state != 'draft'</attribute>
+            </xpath>
+        </field>
+    </record>
+
+    <record id="view_account_payment_register_form_invoicing_restrictions" model="ir.ui.view">
+        <field name="name">account.payment.register.form.invoicing.restrictions</field>
+        <field name="model">account.payment.register</field>
+        <field name="inherit_id" ref="account.view_account_payment_register_form"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='payment_date']" position="attributes">
+                <attribute name="readonly">invoicing_only_user</attribute>
+            </xpath>
         </field>
     </record>
 </odoo>
